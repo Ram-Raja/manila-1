@@ -53,7 +53,7 @@ TRANSITIONAL_STATUSES = (
 )
 
 SUPPORTED_SHARE_PROTOCOLS = (
-    'NFS', 'CIFS', 'GLUSTERFS', 'HDFS')
+    'NFS', 'CIFS', 'GLUSTERFS', 'HDFS', 'CEPHFS')
 
 SECURITY_SERVICES_ALLOWED_TYPES = ['active_directory', 'ldap', 'kerberos']
 
