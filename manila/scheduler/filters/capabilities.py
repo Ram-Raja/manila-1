@@ -72,6 +72,9 @@ class CapabilitiesFilter(base_host.BaseHostFilter):
                 LOG.debug('Share type extra spec requirement '
                           '"%(key)s=%(req)s" does not match reported '
                           'capability "%(cap)s"',
+            if not extra_specs_ops.match(cap, req):
+                LOG.debug("extra_spec key '%(key)s' requirement '%(req)s' "
+                          "does not match '%(cap)s'",
                           {'key': key, 'req': req, 'cap': cap})
                 return False
         return True
