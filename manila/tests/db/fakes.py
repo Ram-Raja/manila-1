@@ -27,6 +27,9 @@ class FakeModel(object):
     def __getattr__(self, name):
         return self.values.get(name)
 
+    def get(self, key, default=None):
+        return self.values.get(key, default)
+
     def __getitem__(self, key):
         if key in self.values:
             return self.values[key]
