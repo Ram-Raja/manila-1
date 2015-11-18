@@ -376,6 +376,12 @@ class ShareMixin(object):
             except ValueError:
                 raise webob.exc.HTTPBadRequest(explanation=exc_str)
 
+    @staticmethod
+    def _validate_cephx_id(cephx_id):
+        if '.' in cephx_id:
+            raise webob.exc.HTTPBadRequest(explanation=_(
+                'Ceph IDs may not contain periods'))
+
     def _allow_access(self, req, id, body):
         """Add share access rule."""
         context = req.environ['manila.context']
@@ -390,8 +396,10 @@ class ShareMixin(object):
             self._validate_username(access_to)
         elif access_type == 'cert':
             self._validate_common_name(access_to.strip())
+        elif access_type == 'cephx':
+            self._validate_cephx_id(access_to.strip())
         else:
-            exc_str = _("Only 'ip','user',or'cert' access types "
+            exc_str = _("Only 'ip','user', 'cert' or 'cephx' access types "
                         "are supported.")
             raise webob.exc.HTTPBadRequest(explanation=exc_str)
         try:
