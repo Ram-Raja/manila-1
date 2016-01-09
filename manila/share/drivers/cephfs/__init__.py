@@ -60,9 +60,6 @@ class CephFSNativeDriver(driver.ShareDriver,):
     supported_protocols = ('CEPHFS',)
     driver_handles_share_servers = False
 
-    # We support snapshots, but not creating shares from them (yet)
-    _snapshots_are_supported = True
-
     def get_share_stats(self, refresh=False):
         data = super(CephFSNativeDriver, self).get_share_stats(refresh)
         data['consistency_group_support'] = 'pool'
