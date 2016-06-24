@@ -42,7 +42,8 @@ The following operations are supported with CephFS backend:
 - Allow/deny CephFS share access
 
   * Only ``cephx`` access type is supported for CephFS protocol.
-  * Only Read/write access level is supported.
+  * ``read-only`` access level is supported in Newton or later versions
+    of manila.
 
 - Extend/shrink share
 - Create/delete snapshot

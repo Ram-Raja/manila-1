@@ -207,14 +207,14 @@ class CephFSNativeDriver(driver.ShareDriver,):
             raise exception.InvalidShareAccess(
                 reason=_("Only 'cephx' access type allowed."))
 
-        if access['access_level'] == constants.ACCESS_LEVEL_RO:
-            raise exception.InvalidShareAccessLevel(
-                level=constants.ACCESS_LEVEL_RO)
-
         ceph_auth_id = access['access_to']
 
-        auth_result = self.volume_client.authorize(self._share_path(share),
-                                                   ceph_auth_id)
+        readonly = (
+            True if access['access_level'] == constants.ACCESS_LEVEL_RO
+            else False)
+
+        auth_result = self.volume_client.authorize(
+            self._share_path(share), ceph_auth_id, readonly=readonly)
 
         return auth_result['auth_key']
 
