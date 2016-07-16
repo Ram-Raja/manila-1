@@ -101,6 +101,7 @@ def fake_access(id, **kwargs):
         'access_type': 'fakeacctype',
         'access_to': 'fakeaccto',
         'access_level': 'rw',
+        'access_key': None,
         'state': 'fakeactive',
         'STATE_NEW': 'fakenew',
         'STATE_ACTIVE': 'fakeactive',

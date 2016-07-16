@@ -516,12 +516,13 @@ class ShareMixin(object):
         self.share_api.deny_access(context, share, access)
         return webob.Response(status_int=202)
 
-    def _access_list(self, req, id, body):
+    def _access_list(self, req, id, body, return_access_key=False):
         """list share access rules."""
         context = req.environ['manila.context']
 
         share = self.share_api.get(context, id)
-        access_list = self.share_api.access_get_all(context, share)
+        access_list = self.share_api.access_get_all(
+            context, share, return_access_key=return_access_key)
         return {'access_list': access_list}
 
     def _extend(self, req, id, body):

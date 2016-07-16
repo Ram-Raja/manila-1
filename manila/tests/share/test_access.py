@@ -70,7 +70,8 @@ class ShareInstanceAccessTestCase(test.TestCase):
                          mock.Mock(return_value=original_rules))
         self.mock_object(db, "share_instance_update_access_status",
                          mock.Mock())
-        self.mock_object(self.driver, "update_access", mock.Mock())
+        self.mock_object(self.driver, "update_access",
+                         mock.Mock(return_value=None))
         self.mock_object(self.share_access_helper,
                          "_remove_access_rules", mock.Mock())
         self.mock_object(self.share_access_helper, "_check_needs_refresh",
@@ -173,7 +174,8 @@ class ShareInstanceAccessTestCase(test.TestCase):
             return_value=share_instance))
         self.mock_object(db, "share_access_get_all_for_instance",
                          mock.Mock(return_value=original_rules))
-        mock_update_access = self.mock_object(self.driver, "update_access")
+        mock_update_access = self.mock_object(self.driver, "update_access",
+                                              mock.Mock(return_value=None))
         self.mock_object(self.share_access_helper, '_check_needs_refresh',
                          mock.Mock(side_effect=[True, False]))
 

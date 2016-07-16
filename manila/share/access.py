@@ -14,9 +14,12 @@
 #    under the License.
 
 from oslo_log import log
+from oslo_utils import uuidutils
 import six
 
 from manila.common import constants
+from manila import exception
+from manila.i18n import _
 from manila.i18n import _LI
 
 LOG = log.getLogger(__name__)
@@ -77,8 +80,9 @@ class ShareInstanceAccess(object):
                     delete_rules = []
 
         try:
+            access_keys = None
             try:
-                self.driver.update_access(
+                access_keys = self.driver.update_access(
                     context,
                     share_instance,
                     rules,
@@ -93,6 +97,33 @@ class ShareInstanceAccess(object):
                 self._update_access_fallback(add_rules, context, delete_rules,
                                              remove_rules, share_instance,
                                              share_server)
+
+            if access_keys:
+                if (
+                    not isinstance(access_keys, dict)
+                    or [access_id for access_id in access_keys.keys()
+                        if not uuidutils.is_uuid_like(access_id)]
+                    or [access_key for access_key in access_keys.values()
+                        if not isinstance(access_key, str)]
+                ):
+                    msg = _("The driver did not return access_keys as "
+                            "a dictionary of access_id, and access_key "
+                            "key: value pairs.")
+                    raise exception.Invalid(message=msg)
+
+                if (
+                    not (add_rules or delete_rules)  # recovery mode
+                    and len(access_keys) != len(rules)
+                ):
+                    msg = _("During recovery of access rules, the driver "
+                            "failed to return access_keys for all the rules "
+                            "it is expected to sync to the backend.")
+                    raise exception.Invalid(message=msg)
+
+                for access_id, access_key in access_keys.items():
+                    self.db.share_access_update_access_key(
+                        context, access_id, access_key)
+
         except Exception:
             self.db.share_instance_update_access_status(
                 context,

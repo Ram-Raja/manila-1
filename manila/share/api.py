@@ -1298,16 +1298,25 @@ class API(base.Base):
 
         self.share_rpcapi.deny_access(context, share_instance, access)
 
-    def access_get_all(self, context, share):
+    def access_get_all(self, context, share, return_access_key=False):
         """Returns all access rules for share."""
         policy.check_policy(context, 'share', 'access_get_all')
         rules = self.db.share_access_get_all_for_share(context, share['id'])
-        return [{'id': rule.id,
-                 'access_type': rule.access_type,
-                 'access_to': rule.access_to,
-                 'access_level': rule.access_level,
-                 'state': rule.state,
-                 } for rule in rules]
+        if not return_access_key:
+            return [{'id': rule.id,
+                     'access_type': rule.access_type,
+                     'access_to': rule.access_to,
+                     'access_level': rule.access_level,
+                     'state': rule.state,
+                     } for rule in rules]
+        else:
+            return [{'id': rule.id,
+                     'access_key': rule.access_key,
+                     'access_type': rule.access_type,
+                     'access_to': rule.access_to,
+                     'access_level': rule.access_level,
+                     'state': rule.state,
+                     } for rule in rules]
 
     def access_get(self, context, access_id):
         """Returns access rule with the id."""

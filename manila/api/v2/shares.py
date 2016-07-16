@@ -145,7 +145,10 @@ class ShareController(shares.ShareMixin,
     @wsgi.action('access_list')
     def access_list(self, req, id, body):
         """List share access rules."""
-        return self._access_list(req, id, body)
+        if req.api_version_request < api_version.APIVersionRequest("2.19"):
+            return self._access_list(req, id, body)
+        else:
+            return self._access_list(req, id, body, return_access_key=True)
 
     @wsgi.Controller.api_version('2.0', '2.6')
     @wsgi.action('os-extend')
