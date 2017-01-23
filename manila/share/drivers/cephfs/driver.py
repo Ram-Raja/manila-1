@@ -14,6 +14,7 @@
 #    under the License.
 
 
+import socket
 import sys
 
 from oslo_config import cfg
@@ -25,8 +26,9 @@ from manila import exception
 from manila.i18n import _, _LI, _LW
 from manila.share import driver
 from manila.share.drivers import ganesha
+from manila.share.drivers.ganesha import utils as ganesha_utils
 from manila.share import share_types
-
+from manila import utils
 
 try:
     import ceph_volume_client
@@ -65,6 +67,18 @@ cephfs_opts = [
                help="The type of protocol helper to use. Default is "
                     "CEPHFS."
                ),
+    cfg.StrOpt('cephfs_ganesha_server_ip',
+               help="Remote Ganesha server node's IP address."),
+    cfg.StrOpt('cephfs_ganesha_server_username',
+               default='root',
+               help="Remote Ganesha server node's username."),
+    cfg.StrOpt('cephfs_ganesha_path_to_private_key',
+               help='Path of Manila host\'s private SSH key file.'),
+    cfg.StrOpt('cephfs_ganesha_server_password',
+               secret=True,
+               help="Remote Ganesha server node's login password. "
+                    "This is not required if "
+                    "'cephfs_ganesha_path_to_private_key' is configured."),
 ]
 
 
@@ -78,7 +92,8 @@ def cephfs_share_path(share):
         share['consistency_group_id'], share['id'])
 
 
-class CephFSDriver(driver.ShareDriver,):
+class CephFSDriver(driver.ExecuteMixin, driver.GaneshaMixin,
+                   driver.ShareDriver,):
     """Driver for the Ceph Filesystem."""
 
     def __init__(self, *args, **kwargs):
@@ -94,11 +109,14 @@ class CephFSDriver(driver.ShareDriver,):
         if self.configuration.cephfs_protocol_helper_type.upper() == "CEPHFS":
             protocol_helper_class = getattr(
                 sys.modules[__name__], 'NativeProtocolHelper')
+        elif self.configuration.cephfs_protocol_helper_type.upper() == "NFS":
+            protocol_helper_class = getattr(
+                sys.modules[__name__], 'NFSProtocolHelper')
         else:
             raise exception.ManilaException()
 
         self.protocol_helper = protocol_helper_class(
-            None,
+            self._execute,
             self.configuration,
             volume_client=self.volume_client)
 
@@ -405,3 +423,79 @@ class NativeProtocolHelper(ganesha.NASHelperBase):
             self._deny_access(context, share, rule)
 
         return access_keys
+
+
+class NFSProtocolHelper(ganesha.GaneshaNASHelper2):
+
+    shared_data = {}
+    supported_protocols = ('NFS',)
+
+    def __init__(self, execute, config_object, **kwargs):
+        if config_object.cephfs_ganesha_server_ip:
+            execute = ganesha_utils.SSHExecutor(
+                config_object.cephfs_ganesha_server_ip, 22, None,
+                config_object.cephfs_ganesha_server_username,
+                password=config_object.cephfs_ganesha_server_password,
+                privatekey=config_object.cephfs_ganesha_path_to_private_key)
+        else:
+            execute = ganesha_utils.RootExecutor(execute)
+        self.ganesha_host = config_object.cephfs_ganesha_server_ip
+        if not self.ganesha_host:
+            self.ganesha_host = socket.gethostname()
+        kwargs['tag'] = '-'.join(('CEPHFS', 'Ganesha', self.ganesha_host))
+
+        self.volume_client = kwargs.pop('volume_client')
+
+        super(NFSProtocolHelper, self).__init__(execute, config_object,
+                                                **kwargs)
+
+    def init_helper(self):
+        @utils.synchronized(self.tag)
+        def _init_helper():
+            if self.tag in self.shared_data:
+                return True
+            super(NFSProtocolHelper, self).init_helper()
+            self.shared_data[self.tag] = {
+                'ganesha': self.ganesha,
+                'export_template': self.export_template}
+            return False
+
+        if _init_helper():
+            tagdata = self.shared_data[self.tag]
+            self.ganesha = tagdata['ganesha']
+            self.export_template = tagdata['export_template']
+
+    def get_export_locations(self, share, cephfs_volume):
+        export_location = "{server_address}:{path}".format(
+            server_address=self.ganesha_host,
+            path=cephfs_volume['mount_path'])
+
+        LOG.info(_LI("Calculated export location for share %(id)s: %(loc)s"),
+                 {"id": share['id'], "loc": export_location})
+
+        return {
+            'path': export_location,
+            'is_admin_only': False,
+            'metadata': {},
+        }
+
+    def _default_config_hook(self):
+        """Callback to provide default export block."""
+        dconf = super(NFSProtocolHelper, self)._default_config_hook()
+        conf_dir = ganesha_utils.path_from(__file__, "conf")
+        ganesha_utils.patch(dconf, self._load_conf_dir(conf_dir))
+        return dconf
+
+    def _fsal_hook(self, base, share, access):
+        """Callback to create FSAL subblock."""
+        return {}
+
+    def _get_export_path(self, share):
+        """Callback to provide export path."""
+        volume_path = cephfs_share_path(share)
+        return self.volume_client._get_path(volume_path)
+
+    def _get_export_pseudo_path(self, share):
+        """Callback to provide pseudo path."""
+        volume_path = cephfs_share_path(share)
+        return self.volume_client._get_path(volume_path)
